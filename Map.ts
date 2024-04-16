@@ -1,16 +1,9 @@
 import fs from "fs/promises";
+import { IdataFormat } from "./IdataFormat";
 
-interface IdataFormat {
-    city: {
-        Burnaby: { households: any[]; clinics: any[]; };
-        Vancouver: { households: any[]; clinics: any[]; };
-        Richmond: { households: any[]; clinics: any[]; };
-    };
-}
 
 export class Map {
     private _mapData: string = '';
-  // constructors, methods, etc
     constructor(mapData: any) {
         this._mapData = mapData;
     }
@@ -23,7 +16,7 @@ export class Map {
 
 
     printMap(data: string) {
-        const dataFormat = JSON.parse(data);
+        const dataFormat: IdataFormat = JSON.parse(data);
         const city = dataFormat.city;
     
         const BurnabyInfo = city["Burnaby"];
