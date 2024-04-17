@@ -1,118 +1,172 @@
 import fs from "fs/promises";
 import { IdataFormat } from "./IdataFormat";
+import { ICityData } from "./ICityData";
+import { IClinic } from "./IClinic";
+import { IPerson } from "./IPerson";
+import { IHousehold } from "./IHousehold";
+import { IQueue } from "./IQueue";
 
 
 export class Map {
-    private _mapData: string = '';
+    private _mapData: string;
     constructor(mapData: any) {
         this._mapData = mapData;
     }
 
     async readJson() {
         const data = await fs.readFile("data.json", "utf-8");
-        return data;
+        return JSON.parse(data);
     }
 
 
 
-    printMap(data: string) {
-        const dataFormat: IdataFormat = JSON.parse(data);
-        const city = dataFormat.city;
-    
-        const BurnabyInfo = city["Burnaby"];
-        const VancouverInfo = city["Vancouver"];
-        const RichmondInfo = city["Richmond"];
-    
-        // Burnaby 처리
-        const BurnabyHouseholds = BurnabyInfo.households[0];
-        const BurnabyInhabitants = BurnabyHouseholds.inhabitants;
-    
-        BurnabyInhabitants.forEach((person: any) => {
-            if (person.isVaccinated === true) {
-                this._mapData += "H";
-            } else {
-                this._mapData += "F";
-            }
-        });
-        for (let i = 0; i < BurnabyInfo.clinics.length; i++) {
-            this._mapData += (BurnabyInfo.clinics.length > 0 ? "C" : "");
-        }
-    
-        this._mapData += "\n";
-    
-        // Vancouver 처리
-        const VancouverHouseholds = VancouverInfo.households[0];
-        const VancouverInhabitants = VancouverHouseholds.inhabitants;
-    
-        VancouverInhabitants.forEach((person: any) => {
-            if (person.isVaccinated === true) {
-                this._mapData += "H";
-            } else {
-                this._mapData += "F";
-            }
-        });
-        for (let i = 0; i < VancouverInfo.clinics.length; i++) {
-            this._mapData += (VancouverInfo.clinics.length > 0 ? "C" : "");
-        }
-    
-        this._mapData += "\n";
-    
-        // Richmond 처리
-        const RichmondHouseholds = RichmondInfo.households[0];
-        const RichmondInhabitants = RichmondHouseholds.inhabitants;
-    
-        RichmondInhabitants.forEach((person: any) => {
-            if (person.isVaccinated === true) {
-                this._mapData += "H";
-            } else {
-                this._mapData += "F";
-            }
-        });
-        for (let i = 0; i < RichmondInfo.clinics.length; i++) {
-            this._mapData += (RichmondInfo.clinics.length > 0 ? "C" : "");
-        }
-        console.log(this._mapData);
-        
-    }
+    printMap(data: ICityData) {
+        const city = data.city;
+        let maxBlockNum = 0;
 
-    registerForShots(data: any) {
-        const dataFormat = JSON.parse(data);
-        const city = dataFormat.city;
+        for (const city in data.city) {
+            const houseHoldData = data.city[city].households;
+            const clinicData = data.city[city].clinics;
 
-        for (const i in city) {
-            if (city[i].households[0].inhabitants[0].isVaccinated === false) {
-                const person = city[i].households[0].inhabitants;
-                for (let i = 0; i < person.length; i++) {
-                    if (person[i].age > 20) {
-                        Object.keys(city).forEach(element => {
-                            
-                            const personInfo = city[element].households[0].inhabitants[0]
-                            const queue = new Queue([]);
-                            queue.enqueue(personInfo.fullName);
-                            queue.getQueue()
-                        });
-                    }
+            const houseHoldBlockNum = houseHoldData.map((h) => h.blockNum);
+            const clinicBlockNum = clinicData.map((c) => c.blockNum);
+            const maxBlocksNum = Math.max(...houseHoldBlockNum, ...clinicBlockNum);
+            maxBlockNum = Math.max(maxBlockNum, maxBlocksNum);
+        }
+
+        for (const city in data.city) {
+            const houseHold = data.city[city].households;
+            const clinics = data.city[city].clinics;
+            let map = '';
+
+            for (let blockNum = 0; blockNum <= maxBlockNum; blockNum++) {
+                const household = houseHold.find((h) => h.blockNum === blockNum);
+                const clinic = clinics.find((c) => c.blockNum === blockNum);
+                if (household) {
+                    const isVaccinated = household.inhabitants.every((data) => data.isVaccinated);
+                    map += (isVaccinated? "F,": "H,");
+                } else if (clinic) {
+                    map += "C,";
+                } else {
+                    map += "X,";
                 }
+
             }
+            console.log(map);
+        }
+    }
+
+    closestClinic(data: any) {
+        for (const city in data.city) {
+            const houseHolds = data.city[city].households;
+            const clinics = data.city[city].clinics;
+            let closestClinicBlock = 0;
+            let minNum = 10000;
+
+            houseHolds.forEach((household: IHousehold) => {
+                const personBlockNum = household.blockNum;
+                clinics.forEach((clinicItem: IClinic) => {
+                    const clinicBlockNum = clinicItem.blockNum;
+                    const diffNum = Math.abs(personBlockNum - clinicBlockNum);
+    
+                    if (diffNum < minNum) {
+                        closestClinicBlock = clinicBlockNum;
+                        minNum = diffNum;
+                    }
+                });
+                const clinic = clinics.find((c: any) => c.blockNum === closestClinicBlock);
+                return clinic;
+            })
+        }
+    }
+
+    registerForShots(data: any, currentIntake: number) {
+        for (const city in data.city) {
+            const houseHolds = data.city[city].households;
+           
+            
+            houseHolds.forEach((household: IHousehold) => {
+                household.inhabitants.forEach((person: IPerson) => {
+                    if (person.isVaccinated === false && person.age >= currentIntake) {
+                       this.closestClinic
+                    }
+                })
+            });
         }
     }
 }
 
-class Queue {
-    private _queue: string[] = []
-    constructor(queue: string[]) {
+
+export class Queue {
+    private _queue: IQueue[];
+    constructor(queue: IQueue[]) {
       this._queue = queue;
     }
 
+    avgTime() {
+        return this._queue.length;
+    }
+
     getQueue() {
-        console.log(this._queue);
+        return this._queue;
     }
   
-    enqueue(person: string) {
-      this._queue.push(person);
+    enqueue(queueItem: IQueue) {
+        this._queue.push(queueItem);
     }
   
     dequeue() {
       return this._queue.shift();
     }
+}
+
+interface IReport {
+    printDetails(): void;
+}
+
+export class ReportMaker {
+    private _report: IReport;
+
+    constructor(report: IReport) {
+        this._report = report;
+    }
+
+    printDetails() {
+        this._report.printDetails();
+    }
+}
+
+export class ComplexReport {
+    private _clinics: IQueue[];
+    constructor(clinics: IQueue[]) {
+      this._clinics = clinics;
+    }
+    printDetails() {
+      this._clinics.forEach(clinic => {
+        const allQueue = clinic.queue?.getQueue;
+        console.log(allQueue);
+        // console.log(`
+        // CLINIC NAME: ${clinic.getQueue()} 
+        // People In Queue:
+        // ${clinic.getQueue}
+        // `)
+      });
+    };
   }
+
+class SimpleReport {
+    private _clinics: IClinic[];
+
+    constructor(clinics: IClinic[]) {
+        this._clinics = clinics
+    }
+
+    // printDetails() {
+    //     this._clinics.forEach((clinic: IClinic) => {
+    //         console.log(`
+    //             ${clinic.getQueue.getQueue()} of people at ${clinic.name}
+    //             The Average wait time is ${clinic.getQueue.getQueue() * 15}
+    //         `)
+    //     })
+    // }
+}
